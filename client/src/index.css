@@ -1,3 +1,25 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+*{
+    font-family: "Outfit", sans-serif;
+}
+
+/* @theme {
+    extend: {
+        colors: {
+            primary: '#111827',
+            secondary: '#1F2937',
+            accent: '#3B82F6',
+            background: '#F9FAFB',
+            text: '#374151',
+        },
+    },
+} */
+
+@theme{
+    --color-primary: #5044E5;
+}
