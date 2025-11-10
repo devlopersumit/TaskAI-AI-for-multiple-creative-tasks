@@ -4,6 +4,7 @@ import Hero from '../components/Hero'
 import AITools from '../components/AITools'
 import Testimonials from '../components/Testimonials'
 import Pricing from '../components/Pricing'
+import Footer from '../components/Footer'
 
 const Home = () => {
   return (
@@ -12,7 +13,8 @@ const Home = () => {
     <Hero />
     <AITools />
     <Testimonials />
-    <Pricing />   
+    <Pricing />
+    <Footer />   
     </>
   )
 }
