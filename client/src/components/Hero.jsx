@@ -1,9 +1,12 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useClerk, useUser } from '@clerk/clerk-react'
 import { assets } from '../assets/assets';
 
 const Hero = () => {
   const navigate = useNavigate();
+  const { openSignIn } = useClerk();
+  const { user } = useUser();
 
   return (
     <div className='px-4 sm:px-20 xl:px-32 relative flex flex-col w-full justify-center bg-[url(./assets/gradientBackground.png)] bg-cover bg-no-repeat min-h-screen'>
@@ -26,7 +29,7 @@ const Hero = () => {
       <div className='flex flex-wrap justify-center gap-4 text-sm max-sm:text-xs mb-8'>
         <button
           className='bg-[#5044E5] text-white px-10 py-3.5 rounded-lg hover:scale-105 active:scale-95 transition-all duration-200 shadow-lg shadow-indigo-200'
-          onClick={() => navigate('/ai')}
+          onClick={() => user ? navigate('/ai') : openSignIn()}
         >
           Start Creating Now
         </button>
