@@ -10,12 +10,17 @@ import RemoveBackground from './pages/RemoveBackground'
 import RemoveObject from './pages/RemoveObject'
 import ReviewResume from './pages/ReviewResume'
 import Community from './pages/Community'
+import Terms from './pages/Terms'
+import Privacy from './pages/Privacy'
+import NotFound from './pages/NotFound'
 
 const App = () => {
   return (
     <div>
       <Routes>
         <Route path = "/" element = {<Home />} />
+        <Route path='/terms' element={<Terms />} />
+        <Route path='/privacy' element={<Privacy />} />
         <Route path = "/ai" element = {<Layout />}>
         <Route index element = {<Dashboard />} />
         <Route path='write-article' element = {<WriteArticle />} />
@@ -26,6 +31,7 @@ const App = () => {
         <Route path='review-resume' element = {<ReviewResume />} />
         <Route path='community' element = {<Community />} />
         </Route>
+        <Route path='*' element={<NotFound />} />
       </Routes>
     </div>
   )
