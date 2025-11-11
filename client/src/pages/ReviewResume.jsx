@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
 import AIModuleLayout from '../components/AIModuleLayout'
-import { Upload, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Upload, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
+import { useUser } from '@clerk/clerk-react'
+import { api, getUserPayload } from '../services/apiClient'
 
 const criteria = [
   { label: 'Clarity & formatting', hint: 'Is the layout easy to scan with clear sections?' },
@@ -12,18 +14,46 @@ const criteria = [
 const ReviewResume = () => {
   const [resumeNotes, setResumeNotes] = useState('')
   const [report, setReport] = useState(null)
+  const [resumeFile, setResumeFile] = useState(null)
+  const [resumeText, setResumeText] = useState('')
+  const [isAnalysing, setIsAnalysing] = useState(false)
+  const [error, setError] = useState(null)
+  const { user } = useUser()
 
-  const handleAnalyse = () => {
-    setReport({
-      highlights: [
-        'Strong project leadership with measurable results.',
-        'Clear mention of cross-functional collaboration.'
-      ],
-      improvements: [
-        'Add outcomes for the latest role to show impact.',
-        'Include relevant tools/tech in the skills section.'
-      ]
-    })
+  const handleFileChange = (event) => {
+    const file = event.target.files?.[0]
+    setResumeFile(file ?? null)
+    setError(null)
+  }
+
+  const handleAnalyse = async () => {
+    if (!resumeFile && !resumeText.trim()) {
+      setError('Upload your resume or paste the content to receive feedback.')
+      return
+    }
+
+    setIsAnalysing(true)
+    setError(null)
+
+    try {
+      const formData = new FormData()
+      if (resumeFile) {
+        formData.append('resume', resumeFile)
+      }
+      formData.append('notes', resumeNotes)
+      formData.append('resumeText', resumeText)
+      formData.append('user', JSON.stringify(getUserPayload(user)))
+
+      const data = await api.reviewResume(formData)
+      setReport({
+        highlights: data?.highlights ?? [],
+        improvements: data?.improvements ?? [],
+      })
+    } catch (apiError) {
+      setError(apiError.message || 'Unable to analyse your resume. Please try again.')
+    } finally {
+      setIsAnalysing(false)
+    }
   }
 
   return (
@@ -59,7 +89,17 @@ const ReviewResume = () => {
             <Upload className='h-8 w-8 text-indigo-500' />
             <span className='mt-4 text-sm font-semibold text-gray-900'>Drop PDF or DOCX</span>
             <span className='mt-2 text-xs text-gray-500'>Max 5MB · Supports .pdf, .docx</span>
-            <input type='file' accept='.pdf,.docx' className='hidden' />
+            <input
+              type='file'
+              accept='.pdf,.docx'
+              className='hidden'
+              onChange={handleFileChange}
+            />
+            {resumeFile && (
+              <span className='mt-4 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600'>
+                {resumeFile.name}
+              </span>
+            )}
           </label>
           <div>
             <label className='text-sm font-medium text-gray-700' htmlFor='resume-notes'>
@@ -75,13 +115,38 @@ const ReviewResume = () => {
             />
           </div>
         </div>
+        <div className='mt-6'>
+          <label className='text-sm font-medium text-gray-700' htmlFor='resume-text'>
+            Paste resume content (optional)
+          </label>
+          <textarea
+            id='resume-text'
+            value={resumeText}
+            onChange={(event) => setResumeText(event.target.value)}
+            rows={8}
+            placeholder='Paste your resume text here if you do not want to upload the file.'
+            className='mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'
+          />
+        </div>
         <button
           type='button'
           className='mt-6 inline-flex items-center gap-2 rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500'
           onClick={handleAnalyse}
+          disabled={isAnalysing}
         >
-          Analyse resume
+          {isAnalysing ? (
+            <>
+              <Loader2 className='h-4 w-4 animate-spin' /> Analysing
+            </>
+          ) : (
+            'Analyse resume'
+          )}
         </button>
+        {error && (
+          <p className='mt-4 text-sm text-red-600'>
+            {error}
+          </p>
+        )}
       </section>
 
       <section className='rounded-3xl border border-gray-200 bg-white p-6 shadow-sm'>
