@@ -2,6 +2,8 @@ import React, { useState } from 'react'
 import AIModuleLayout from '../components/AIModuleLayout'
 import { assets } from '../assets/assets'
 import { Loader2 } from 'lucide-react'
+import { useUser } from '@clerk/clerk-react'
+import { api, getUserPayload } from '../services/apiClient'
 
 const styles = ['Photorealistic', 'Illustration', 'Minimalist', '3D render', 'Watercolour']
 const ratios = ['Square 1:1', 'Portrait 4:5', 'Landscape 16:9']
@@ -12,14 +14,30 @@ const GenerateImages = () => {
   const [ratio, setRatio] = useState(ratios[0])
   const [isLoading, setIsLoading] = useState(false)
   const [images, setImages] = useState([])
+  const [error, setError] = useState(null)
+  const { user } = useUser()
 
-  const handleGenerate = (event) => {
+  const handleGenerate = async (event) => {
     event.preventDefault()
     setIsLoading(true)
-    setTimeout(() => {
-      setImages([assets.ai_gen_img_1, assets.ai_gen_img_2, assets.ai_gen_img_3])
+    setError(null)
+    setImages([])
+
+    try {
+      const data = await api.generateImages({
+        prompt,
+        style,
+        ratio,
+        user: getUserPayload(user),
+      })
+      const generated = data?.images ?? []
+      setImages(generated.length ? generated : [assets.ai_gen_img_1, assets.ai_gen_img_2, assets.ai_gen_img_3])
+    } catch (apiError) {
+      setError(apiError.message || 'Unable to generate images. Please try again.')
+      setImages([])
+    } finally {
       setIsLoading(false)
-    }, 900)
+    }
   }
 
   return (
@@ -118,6 +136,12 @@ const GenerateImages = () => {
             )}
           </button>
         </form>
+
+        {error && (
+          <p className='mt-4 text-sm text-red-600'>
+            {error}
+          </p>
+        )}
       </section>
 
       <section className='rounded-3xl border border-gray-200 bg-white p-6 shadow-sm'>
@@ -138,7 +162,10 @@ const GenerateImages = () => {
                 <button className='rounded-full border border-gray-300 px-4 py-2 text-gray-700 transition hover:border-indigo-200 hover:text-indigo-600'>
                   Upscale
                 </button>
-                <button className='rounded-full border border-gray-300 px-4 py-2 text-gray-700 transition hover:border-indigo-200 hover:text-indigo-600'>
+                <button
+                  className='rounded-full border border-gray-300 px-4 py-2 text-gray-700 transition hover:border-indigo-200 hover:text-indigo-600'
+                  onClick={() => window.open(src, '_blank')}
+                >
                   Download
                 </button>
               </div>
