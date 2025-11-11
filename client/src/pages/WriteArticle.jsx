@@ -1,5 +1,8 @@
 import React, { useState } from 'react'
+import { Loader2 } from 'lucide-react'
+import { useUser } from '@clerk/clerk-react'
 import AIModuleLayout from '../components/AIModuleLayout'
+import { api, getUserPayload } from '../services/apiClient'
 
 const tones = ['Friendly', 'Professional', 'Playful', 'Technical']
 const lengths = ['Short (300 words)', 'Medium (600 words)', 'Long (1,000+ words)']
@@ -16,12 +19,33 @@ const WriteArticle = () => {
   const [outline, setOutline] = useState(outlines[0])
   const [keywords, setKeywords] = useState('')
   const [result, setResult] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [error, setError] = useState(null)
+  const { user } = useUser()
 
-  const handleGenerate = (event) => {
+  const handleGenerate = async (event) => {
     event.preventDefault()
-    const summary = `Here's a ${length.toLowerCase()} article about **${topic || 'your topic'}** written in a ${tone.toLowerCase()} tone. We follow the outline: ${outline.toLowerCase()}.`
-    const body = `TaskAI helps you draft faster. Mention these keywords: ${keywords || 'add specific keywords here'}.\n\nNext steps:\n1. Expand each section with real insights.\n2. Add quotes, stats, and internal links.\n3. Review voice and brand alignment.`
-    setResult(`${summary}\n\n${body}`)
+    setIsGenerating(true)
+    setError(null)
+    setResult('')
+
+    try {
+      const payload = {
+        topic,
+        tone,
+        length,
+        outline,
+        keywords,
+        user: getUserPayload(user),
+      }
+
+      const data = await api.generateArticle(payload)
+      setResult(data?.draft ?? '')
+    } catch (apiError) {
+      setError(apiError.message || 'Unable to generate article. Please try again.')
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
   return (
@@ -141,9 +165,16 @@ const WriteArticle = () => {
           <div className='flex flex-wrap gap-3'>
             <button
               type='submit'
-              className='rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500'
+              className='inline-flex items-center gap-2 rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60'
+              disabled={isGenerating}
             >
-              Generate draft
+              {isGenerating ? (
+                <>
+                  <Loader2 className='h-4 w-4 animate-spin' /> Generating
+                </>
+              ) : (
+                'Generate draft'
+              )}
             </button>
             <button
               type='button'
@@ -152,11 +183,18 @@ const WriteArticle = () => {
                 setTopic('')
                 setKeywords('')
                 setResult('')
+                setError(null)
               }}
             >
               Clear
             </button>
           </div>
+
+          {error && (
+            <p className='text-sm text-red-600'>
+              {error}
+            </p>
+          )}
         </form>
       </section>
 
