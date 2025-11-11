@@ -1,10 +1,67 @@
-import React from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import AIModuleLayout from '../components/AIModuleLayout'
-import { Upload } from 'lucide-react'
+import { Upload, Loader2 } from 'lucide-react'
+import { useUser } from '@clerk/clerk-react'
+import { api, getUserPayload } from '../services/apiClient'
 
 const steps = ['Upload or drop an image (PNG/JPG, max 10MB)', 'TaskAI detects the subject automatically', 'Download the clean PNG or add a new background']
 
 const RemoveBackground = () => {
+  const { user } = useUser()
+  const [file, setFile] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState(null)
+  const [resultUrl, setResultUrl] = useState('')
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [error, setError] = useState(null)
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null)
+      return () => {}
+    }
+
+    const objectUrl = URL.createObjectURL(file)
+    setPreviewUrl(objectUrl)
+
+    return () => {
+      URL.revokeObjectURL(objectUrl)
+    }
+  }, [file])
+
+  const handleFileChange = (event) => {
+    const selected = event.target.files?.[0]
+    if (selected) {
+      setFile(selected)
+      setResultUrl('')
+      setError(null)
+    }
+  }
+
+  const handleRemoveBackground = async () => {
+    if (!file) {
+      setError('Please upload an image before running background removal.')
+      return
+    }
+
+    setIsProcessing(true)
+    setError(null)
+    setResultUrl('')
+
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      formData.append('user', JSON.stringify(getUserPayload(user)))
+
+      const data = await api.removeBackground(formData)
+      setResultUrl(data?.imageUrl ?? '')
+    } catch (apiError) {
+      setError(apiError.message || 'Unable to remove background. Please try again.')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
   return (
     <AIModuleLayout
       badge='Image cleanup'
@@ -38,7 +95,13 @@ const RemoveBackground = () => {
             <Upload className='h-8 w-8 text-indigo-500' />
             <span className='mt-4 text-sm font-semibold text-gray-900'>Drop image here</span>
             <span className='mt-2 text-xs text-gray-500'>PNG or JPG up to 10MB</span>
-            <input type='file' accept='image/png,image/jpeg' className='hidden' />
+            <input
+              ref={inputRef}
+              type='file'
+              accept='image/png,image/jpeg'
+              className='hidden'
+              onChange={handleFileChange}
+            />
           </label>
           <div className='flex-1 space-y-4 rounded-3xl border border-gray-200 bg-gray-50 p-6 text-sm text-gray-600'>
             <h3 className='text-base font-semibold text-gray-900'>How it works</h3>
@@ -49,6 +112,41 @@ const RemoveBackground = () => {
             </ol>
           </div>
         </div>
+        <div className='mt-6 flex flex-wrap gap-3'>
+          <button
+            type='button'
+            className='inline-flex items-center gap-2 rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60'
+            onClick={handleRemoveBackground}
+            disabled={isProcessing}
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className='h-4 w-4 animate-spin' /> Processing
+              </>
+            ) : (
+              'Remove background'
+            )}
+          </button>
+          <button
+            type='button'
+            className='rounded-full border border-gray-300 px-6 py-2.5 text-sm font-semibold text-gray-700 transition hover:border-indigo-200 hover:text-indigo-600'
+            onClick={() => {
+              setFile(null)
+              setResultUrl('')
+              setError(null)
+              if (inputRef.current) {
+                inputRef.current.value = ''
+              }
+            }}
+          >
+            Reset
+          </button>
+        </div>
+        {error && (
+          <p className='mt-4 text-sm text-red-600'>
+            {error}
+          </p>
+        )}
       </section>
 
       <section className='rounded-3xl border border-gray-200 bg-white p-6 shadow-sm'>
@@ -56,17 +154,29 @@ const RemoveBackground = () => {
         <div className='mt-4 grid gap-6 md:grid-cols-2'>
           <div className='rounded-2xl border border-gray-200 bg-gray-50 p-6'>
             <p className='text-sm font-semibold text-gray-900'>Original</p>
-            <div className='mt-3 flex h-56 items-center justify-center rounded-xl border border-dashed border-gray-300'>
-              <span className='text-xs text-gray-500'>Upload an image to preview</span>
-            </div>
+            {previewUrl ? (
+              <img src={previewUrl} alt='Original upload preview' className='mt-3 h-56 w-full rounded-xl object-cover' />
+            ) : (
+              <div className='mt-3 flex h-56 items-center justify-center rounded-xl border border-dashed border-gray-300'>
+                <span className='text-xs text-gray-500'>Upload an image to preview</span>
+              </div>
+            )}
           </div>
           <div className='rounded-2xl border border-gray-200 bg-gray-50 p-6'>
             <p className='text-sm font-semibold text-gray-900'>Background removed</p>
-            <div className='mt-3 flex h-56 items-center justify-center rounded-xl border border-dashed border-gray-300 bg-[url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAUEBAQCI/7kAAAAASUVORK5CYII=")]'>
-              <span className='text-xs text-gray-500'>Result will appear here</span>
-            </div>
+            {resultUrl ? (
+              <img src={resultUrl} alt='Background removed preview' className='mt-3 h-56 w-full rounded-xl object-cover bg-[url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAUEBAQCI/7kAAAAASUVORK5CYII=")]' />
+            ) : (
+              <div className='mt-3 flex h-56 items-center justify-center rounded-xl border border-dashed border-gray-300 bg-[url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAUEBAQCI/7kAAAAASUVORK5CYII=")]'>
+                <span className='text-xs text-gray-500'>Result will appear here</span>
+              </div>
+            )}
             <div className='mt-4 flex flex-wrap gap-2 text-xs'>
-              <button className='rounded-full border border-gray-300 px-4 py-2 text-gray-700 transition hover:border-indigo-200 hover:text-indigo-600'>
+              <button
+                className='rounded-full border border-gray-300 px-4 py-2 text-gray-700 transition hover:border-indigo-200 hover:text-indigo-600 disabled:cursor-not-allowed disabled:opacity-60'
+                disabled={!resultUrl}
+                onClick={() => resultUrl && window.open(resultUrl, '_blank')}
+              >
                 Download PNG
               </button>
               <button className='rounded-full border border-gray-300 px-4 py-2 text-gray-700 transition hover:border-indigo-200 hover:text-indigo-600'>
