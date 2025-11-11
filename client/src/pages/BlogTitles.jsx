@@ -1,29 +1,48 @@
-import React, { useMemo, useState } from 'react'
+import React, { useState } from 'react'
+import { Loader2 } from 'lucide-react'
+import { useUser } from '@clerk/clerk-react'
 import AIModuleLayout from '../components/AIModuleLayout'
+import { api, getUserPayload } from '../services/apiClient'
 
 const categories = ['Technology', 'Marketing', 'Productivity', 'Design', 'AI & Data']
 const vibes = ['Educational', 'Curious', 'Bold', 'Conversational', 'Playful']
-
-const generateTitles = (topic, vibe) => {
-  if (!topic) return []
-  const base = topic.trim()
-  const tone = vibe.toLowerCase()
-  return [
-    `${base}: ${tone === 'bold' ? 'The Playbook' : 'A Practical Guide'}`,
-    `Why ${base} Matters in ${new Date().getFullYear()}`,
-    `From Idea to Impact: ${base} Explained`,
-    `${base} – ${tone === 'playful' ? 'Surprising Truths' : 'Key Lessons'} You Should Know`,
-    `How to Master ${base} Without Burning Out`
-  ]
-}
 
 const BlogTitles = () => {
   const [topic, setTopic] = useState('')
   const [category, setCategory] = useState(categories[0])
   const [vibe, setVibe] = useState(vibes[0])
   const [savedTitles, setSavedTitles] = useState([])
+  const [suggestions, setSuggestions] = useState([])
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [error, setError] = useState(null)
+  const { user } = useUser()
 
-  const suggestions = useMemo(() => generateTitles(topic, vibe), [topic, vibe])
+  const handleGenerate = async (event) => {
+    event.preventDefault()
+
+    if (!topic.trim()) {
+      setError('Please provide a topic to generate titles.')
+      return
+    }
+
+    setIsGenerating(true)
+    setError(null)
+    setSuggestions([])
+
+    try {
+      const data = await api.generateBlogTitles({
+        topic,
+        category,
+        vibe,
+        user: getUserPayload(user),
+      })
+      setSuggestions(data?.titles ?? [])
+    } catch (apiError) {
+      setError(apiError.message || 'Unable to generate titles. Please try again.')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
 
   const handleSave = (title) => {
     if (!savedTitles.includes(title)) {
@@ -54,7 +73,7 @@ const BlogTitles = () => {
     >
       <section className='rounded-3xl border border-gray-200 bg-white p-6 shadow-sm'>
         <h2 className='text-lg font-semibold text-gray-900'>Describe your post</h2>
-        <div className='mt-6 space-y-6'>
+        <form className='mt-6 space-y-6' onSubmit={handleGenerate}>
           <div>
             <label className='text-sm font-medium text-gray-700' htmlFor='topic'>
               Post topic
@@ -66,6 +85,7 @@ const BlogTitles = () => {
               onChange={(event) => setTopic(event.target.value)}
               placeholder='e.g. Building a marketing workflow with AI assistants'
               className='mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'
+              required
             />
           </div>
 
@@ -105,7 +125,40 @@ const BlogTitles = () => {
               </select>
             </div>
           </div>
-        </div>
+
+          <div className='flex flex-wrap items-center gap-3'>
+            <button
+              type='submit'
+              className='inline-flex items-center gap-2 rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60'
+              disabled={isGenerating}
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className='h-4 w-4 animate-spin' /> Generating
+                </>
+              ) : (
+                'Generate titles'
+              )}
+            </button>
+            <button
+              type='button'
+              className='rounded-full border border-gray-300 px-6 py-2.5 text-sm font-semibold text-gray-700 transition hover:border-indigo-200 hover:text-indigo-600'
+              onClick={() => {
+                setSuggestions([])
+                setTopic('')
+                setError(null)
+              }}
+            >
+              Clear
+            </button>
+          </div>
+
+          {error && (
+            <p className='text-sm text-red-600'>
+              {error}
+            </p>
+          )}
+        </form>
       </section>
 
       <section className='rounded-3xl border border-gray-200 bg-white p-6 shadow-sm'>
@@ -119,7 +172,7 @@ const BlogTitles = () => {
         <div className='mt-4 grid gap-4 md:grid-cols-2'>
           {suggestions.length === 0 && (
             <p className='rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6 text-sm text-gray-500'>
-              Add a topic to generate headline options. You can then save, copy, or refine them.
+              Add a topic and click “Generate titles” to receive AI suggestions. You can then save, copy, or refine them.
             </p>
           )}
           {suggestions.map((title) => (
