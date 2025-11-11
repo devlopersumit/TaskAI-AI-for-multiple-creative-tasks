@@ -1,10 +1,57 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import AIModuleLayout from '../components/AIModuleLayout'
-import { dummyPublishedCreationData } from '../assets/assets'
-import { Users, Heart } from 'lucide-react'
+import { Users, Heart, Loader2 } from 'lucide-react'
+import { api } from '../services/apiClient'
+import { assets } from '../assets/assets'
 
 const Community = () => {
-  const creations = dummyPublishedCreationData.slice(0, 6)
+  const [creations, setCreations] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    let ignore = false
+
+    const loadCommunity = async () => {
+      setIsLoading(true)
+      setError(null)
+      try {
+        const data = await api.getCommunityCreations({ limit: 12 })
+        if (!ignore) {
+          setCreations(data ?? [])
+        }
+      } catch (apiError) {
+        if (!ignore) {
+          setError(apiError.message || 'Unable to load community feed.')
+        }
+      } finally {
+        if (!ignore) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    loadCommunity()
+
+    return () => {
+      ignore = true
+    }
+  }, [])
+
+  const getMedia = (item) => {
+    if (item?.type === 'image') {
+      return item.content?.images?.[0]
+    }
+    if (item?.type === 'background-removal' || item?.type === 'object-removal') {
+      return item.content?.resultUrl
+    }
+    return assets.ai_gen_img_2
+  }
+
+  const getCreatorLabel = (item) => {
+    const identifier = item.userId || item.user_id || 'Creator'
+    return identifier.replace('user_', 'Creator ')
+  }
 
   return (
     <AIModuleLayout
@@ -43,17 +90,33 @@ const Community = () => {
           </a>
         </div>
         <div className='mt-6 grid gap-6 md:grid-cols-3'>
+          {isLoading && (
+            <div className='rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6 text-sm text-gray-500'>
+              <Loader2 className='mb-2 h-5 w-5 animate-spin text-indigo-500' />
+              Fetching community highlights…
+            </div>
+          )}
+          {!isLoading && error && (
+            <div className='rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700'>
+              {error}
+            </div>
+          )}
+          {!isLoading && !error && creations.length === 0 && (
+            <p className='rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6 text-sm text-gray-500'>
+              No community posts yet. Publish your creations to see them showcased here!
+            </p>
+          )}
           {creations.map((item) => (
             <article key={item.id} className='flex flex-col gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-600'>
-              <img src={item.content} alt={item.prompt} className='aspect-square w-full rounded-2xl object-cover' />
+              <img src={getMedia(item)} alt={item.prompt} className='aspect-square w-full rounded-2xl object-cover' />
               <div>
                 <p className='line-clamp-3 text-gray-700'>{item.prompt}</p>
                 <div className='mt-4 flex items-center justify-between text-xs text-gray-500'>
                   <span className='inline-flex items-center gap-1 font-semibold text-indigo-600'>
-                    <Users className='h-3.5 w-3.5' /> {item.user_id.replace('user_', 'Creator ')}
+                    <Users className='h-3.5 w-3.5' /> {getCreatorLabel(item)}
                   </span>
                   <span className='inline-flex items-center gap-1'>
-                    <Heart className='h-3.5 w-3.5 text-pink-500' /> {item.likes.length}
+                    <Heart className='h-3.5 w-3.5 text-pink-500' /> {(item.likes?.length ?? item.metadata?.likes?.length) ?? 0}
                   </span>
                 </div>
               </div>
